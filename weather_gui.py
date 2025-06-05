@@ -1,77 +1,75 @@
+import os
 import tkinter as tk
 from tkinter import messagebox
+
 import requests
-from bs4 import BeautifulSoup
+from tkintermapview import TkinterMapView
 
 
-def fetch_weather(location_code: str) -> str:
-    """Fetch the current temperature from weather.com given a location code.
+API_KEY = os.environ.get("WEATHER_API_KEY")
 
-    Parameters
-    ----------
-    location_code : str
-        A location code recognized by weather.com (e.g., "USNY0996:1:US" for New York).
 
-    Returns
-    -------
-    str
-        A human-readable description of the current weather.
-    """
-    url = f"https://weather.com/weather/today/l/{location_code}"
+def fetch_weather(lat: float, lon: float) -> str:
+    """Fetch current weather from weather.com API using latitude/longitude."""
+    if not API_KEY:
+        raise RuntimeError("WEATHER_API_KEY environment variable not set")
+
+    url = "https://api.weather.com/v3/wx/conditions/current"
+    params = {
+        "geocode": f"{lat},{lon}",
+        "format": "json",
+        "language": "en-US",
+        "apiKey": API_KEY,
+    }
+
     try:
-        response = requests.get(url, timeout=10)
+        response = requests.get(url, params=params, timeout=10)
         response.raise_for_status()
     except requests.RequestException as exc:
         raise RuntimeError(f"Failed to fetch weather data: {exc}") from exc
 
-    soup = BeautifulSoup(response.text, "html.parser")
+    data = response.json()
+    temperature = data.get("temperature")
+    description = data.get("narrative") or data.get("wxPhraseLong")
 
-    temp_tag = soup.find(class_="CurrentConditions--tempValue--3KcTQ")
-    desc_tag = soup.find(class_="CurrentConditions--phraseValue--2xXSr")
+    if temperature is None or description is None:
+        raise RuntimeError("Unexpected response from weather API")
 
-    if not temp_tag or not desc_tag:
-        raise RuntimeError("Could not parse weather data from weather.com")
-
-    temperature = temp_tag.text.strip()
-    description = desc_tag.text.strip()
-
-    return f"{description}, {temperature}"
+    return f"{description}, {temperature}°"
 
 
-def show_weather():
-    loc = location_entry.get().strip()
-    if not loc:
-        messagebox.showwarning("Input required", "Please enter a location code")
-        return
+class WeatherApp(tk.Tk):
+    def __init__(self):
+        super().__init__()
+        self.title("Weather Map Viewer")
+        self.geometry("800x650")
 
-    try:
-        result = fetch_weather(loc)
-    except Exception as exc:
-        messagebox.showerror("Error", str(exc))
-        return
+        self.map_widget = TkinterMapView(self, width=800, height=600)
+        self.map_widget.pack(fill="both", expand=True)
+        self.map_widget.add_left_click_map_command(self.on_map_click)
 
-    weather_var.set(result)
+        self.selected_marker = None
+        self.weather_var = tk.StringVar(value="Click on the map to select a location.")
+        label = tk.Label(self, textvariable=self.weather_var, wraplength=780)
+        label.pack(pady=5)
+
+    def on_map_click(self, coords):
+        lat, lon = coords
+        if self.selected_marker:
+            self.map_widget.delete(self.selected_marker)
+        self.selected_marker = self.map_widget.set_marker(lat, lon)
+        try:
+            weather = fetch_weather(lat, lon)
+        except Exception as exc:
+            messagebox.showerror("Error", str(exc))
+            return
+        self.weather_var.set(f"Weather at {lat:.4f}, {lon:.4f}: {weather}")
 
 
-# Build GUI
-root = tk.Tk()
-root.title("Weather.com Viewer")
+def main():
+    app = WeatherApp()
+    app.mainloop()
 
-frm = tk.Frame(root, padx=10, pady=10)
-frm.pack()
 
-location_label = tk.Label(frm, text="Location code:")
-location_label.grid(row=0, column=0, sticky="w")
-
-location_entry = tk.Entry(frm, width=20)
-location_entry.grid(row=0, column=1, sticky="we", padx=(5, 0))
-location_entry.insert(0, "USNY0996:1:US")
-
-fetch_button = tk.Button(frm, text="Fetch Weather", command=show_weather)
-fetch_button.grid(row=0, column=2, padx=(5, 0))
-
-weather_var = tk.StringVar(value="Weather info will appear here")
-weather_label = tk.Label(frm, textvariable=weather_var, wraplength=300)
-weather_label.grid(row=1, column=0, columnspan=3, pady=(10, 0))
-
-root.mainloop()
+if __name__ == "__main__":
+    main()

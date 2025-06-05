@@ -1,21 +1,24 @@
 # pythonGUI
 
-This repository now includes a simple Tkinter application that fetches weather
-information from **weather.com** for a provided location code. The GUI allows
-you to type a location code such as `USNY0996:1:US` and displays the current
-condition and temperature as reported on the site.
+This repository contains a Tkinter application that displays weather
+information from **weather.com** using their public API. The user selects
+a location by clicking on a map.
 
 ## Usage
 
-1. Install dependencies
+1. Obtain a weather.com API key and export it as `WEATHER_API_KEY`:
+   ```bash
+   export WEATHER_API_KEY=YOUR_KEY_HERE
+   ```
+2. Install dependencies
    ```bash
    pip install -r requirements.txt
    ```
-2. Run the application
+3. Run the application
    ```bash
    python weather_gui.py
    ```
 
-The program attempts to fetch the HTML from weather.com and parse it for the
-current conditions and temperature. Depending on your network settings or the
-site's restrictions, this may fail with an error.
+Click on a location on the map to fetch and display the current
+conditions and temperature for that point. The map uses OpenStreetMap
+tiles via `tkintermapview`.
