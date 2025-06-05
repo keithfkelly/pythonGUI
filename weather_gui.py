@@ -1,47 +1,44 @@
 import tkinter as tk
 from tkinter import messagebox
 import requests
-from bs4 import BeautifulSoup
+
+API_KEY = "748d6ed0cb9c0c3bc8d3cdadb904af2b"
 
 
-def fetch_weather(location_code: str) -> str:
-    """Fetch the current temperature from weather.com given a location code.
+def fetch_weather(location: str) -> str:
+    """Fetch the current weather from OpenWeatherMap for a city or location.
 
     Parameters
     ----------
-    location_code : str
-        A location code recognized by weather.com (e.g., "USNY0996:1:US" for New York).
-
+    location : str
+        City name or location code understood by OpenWeatherMap.
     Returns
     -------
     str
-        A human-readable description of the current weather.
+        A human-readable description of the current weather in Celsius.
     """
-    url = f"https://weather.com/weather/today/l/{location_code}"
+    url = "https://api.openweathermap.org/data/2.5/weather"
+    params = {"q": location, "appid": API_KEY, "units": "metric"}
     try:
-        response = requests.get(url, timeout=10)
+        response = requests.get(url, params=params, timeout=10)
         response.raise_for_status()
     except requests.RequestException as exc:
         raise RuntimeError(f"Failed to fetch weather data: {exc}") from exc
 
-    soup = BeautifulSoup(response.text, "html.parser")
+    data = response.json()
+    if "weather" not in data or "main" not in data:
+        raise RuntimeError("Unexpected response structure from OpenWeatherMap")
 
-    temp_tag = soup.find(class_="CurrentConditions--tempValue--3KcTQ")
-    desc_tag = soup.find(class_="CurrentConditions--phraseValue--2xXSr")
+    description = data["weather"][0]["description"].capitalize()
+    temperature = data["main"]["temp"]
 
-    if not temp_tag or not desc_tag:
-        raise RuntimeError("Could not parse weather data from weather.com")
-
-    temperature = temp_tag.text.strip()
-    description = desc_tag.text.strip()
-
-    return f"{description}, {temperature}"
+    return f"{description}, {temperature:.1f} \N{DEGREE SIGN}C"
 
 
 def show_weather():
     loc = location_entry.get().strip()
     if not loc:
-        messagebox.showwarning("Input required", "Please enter a location code")
+        messagebox.showwarning("Input required", "Please enter a location")
         return
 
     try:
@@ -55,17 +52,17 @@ def show_weather():
 
 # Build GUI
 root = tk.Tk()
-root.title("Weather.com Viewer")
+root.title("OpenWeatherMap Viewer")
 
 frm = tk.Frame(root, padx=10, pady=10)
 frm.pack()
 
-location_label = tk.Label(frm, text="Location code:")
+location_label = tk.Label(frm, text="Location:")
 location_label.grid(row=0, column=0, sticky="w")
 
 location_entry = tk.Entry(frm, width=20)
 location_entry.grid(row=0, column=1, sticky="we", padx=(5, 0))
-location_entry.insert(0, "USNY0996:1:US")
+location_entry.insert(0, "London")
 
 fetch_button = tk.Button(frm, text="Fetch Weather", command=show_weather)
 fetch_button.grid(row=0, column=2, padx=(5, 0))
